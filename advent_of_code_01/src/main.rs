@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use std::{collections::BTreeMap, fs::read_to_string};
+use std::fs::read_to_string;
 
 fn parse_file(filename: &str) -> Result<(Vec<u32>, Vec<u32>)> {
     let mut left_list = Vec::new();
@@ -33,23 +33,11 @@ fn calculate_total_distance(filename: &str) -> Result<u32> {
 fn calculate_similarity_score(filename: &str) -> Result<u32> {
     let (left, right) = parse_file(filename)?;
 
-    let mut right_mapped: BTreeMap<u32, u32> = BTreeMap::new();
-    for v in right.iter() {
-        if let Some(value) = right_mapped.get_mut(v) {
-            *value += 1;
-        } else {
-            right_mapped.insert(*v, 1);
-        }
-    }
-
     Ok(left
         .iter()
         .map(|left| {
-            if let Some(right) = right_mapped.get_mut(left) {
-                left * *right
-            } else {
-                0
-            }
+            let right = right.iter().filter(|r| *r == left).count() as u32;
+            left * right
         })
         .sum())
 }
