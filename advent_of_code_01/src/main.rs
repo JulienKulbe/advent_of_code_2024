@@ -1,23 +1,14 @@
 use anyhow::{Context, Result};
 use std::fs::read_to_string;
 
-fn parse_line(line: &str) -> Result<(u32, u32)> {
-    let (left, right) = line
-        .split_once(char::is_whitespace)
-        .context("expected two values for each line")?;
-    let left = left.trim().parse::<u32>()?;
-    let right = right.trim().parse::<u32>()?;
-    Ok((left, right))
-}
+fn main() -> Result<()> {
+    let distance = calculate_total_distance("input.txt")?;
+    println!("Total distance: {}", distance);
 
-fn parse_file(filename: &str) -> Result<(Vec<u32>, Vec<u32>)> {
-    let data = read_to_string(filename)?;
-    Ok(data
-        .lines()
-        .map(parse_line)
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .unzip())
+    let score = calculate_similarity_score("input.txt")?;
+    println!("Similarity score: {}", score);
+
+    Ok(())
 }
 
 fn calculate_total_distance(filename: &str) -> Result<u32> {
@@ -45,14 +36,23 @@ fn calculate_similarity_score(filename: &str) -> Result<u32> {
         .sum())
 }
 
-fn main() -> Result<()> {
-    let distance = calculate_total_distance("input.txt")?;
-    println!("Total distance: {}", distance);
+fn parse_file(filename: &str) -> Result<(Vec<u32>, Vec<u32>)> {
+    let data = read_to_string(filename)?;
+    Ok(data
+        .lines()
+        .map(parse_line)
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .unzip())
+}
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {}", score);
-
-    Ok(())
+fn parse_line(line: &str) -> Result<(u32, u32)> {
+    let (left, right) = line
+        .split_once(char::is_whitespace)
+        .context("expected two values for each line")?;
+    let left = left.trim().parse::<u32>()?;
+    let right = right.trim().parse::<u32>()?;
+    Ok((left, right))
 }
 
 #[cfg(test)]
