@@ -16,8 +16,7 @@ fn parse_file(filename: &str) -> Result<(Vec<u32>, Vec<u32>)> {
         .lines()
         .map(parse_line)
         .collect::<Result<Vec<_>, _>>()?
-        .iter()
-        .cloned()
+        .into_iter()
         .unzip())
 }
 
