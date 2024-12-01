@@ -3,10 +3,10 @@ use std::fs::read_to_string;
 
 fn main() -> Result<()> {
     let distance = calculate_total_distance("input.txt")?;
-    println!("Total distance: {}", distance);
+    println!("Total distance: {distance}");
 
     let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {}", score);
+    println!("Similarity score: {score}");
 
     Ok(())
 }
