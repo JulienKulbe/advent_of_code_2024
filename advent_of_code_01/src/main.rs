@@ -1,20 +1,24 @@
 use anyhow::{Context, Result};
 use std::fs::read_to_string;
 
+fn parse_line(line: &str) -> Result<(u32, u32)> {
+    let (left, right) = line
+        .split_once(char::is_whitespace)
+        .context("expected two values for each line")?;
+    let left = left.trim().parse::<u32>()?;
+    let right = right.trim().parse::<u32>()?;
+    Ok((left, right))
+}
+
 fn parse_file(filename: &str) -> Result<(Vec<u32>, Vec<u32>)> {
-    let mut left_list = Vec::new();
-    let mut right_list = Vec::new();
-
     let data = read_to_string(filename)?;
-    for line in data.lines() {
-        let (left, right) = line
-            .split_once(char::is_whitespace)
-            .context("expected two values for each line")?;
-        left_list.push(left.trim().parse::<u32>()?);
-        right_list.push(right.trim().parse::<u32>()?);
-    }
-
-    Ok((left_list, right_list))
+    Ok(data
+        .lines()
+        .map(parse_line)
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
+        .cloned()
+        .unzip())
 }
 
 fn calculate_total_distance(filename: &str) -> Result<u32> {
