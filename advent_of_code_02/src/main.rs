@@ -37,16 +37,16 @@ fn parse_file(filename: &str) -> Result<Vec<Vec<u32>>> {
 
 fn parse_line(line: &str) -> Result<Vec<u32>, ParseIntError> {
     line.split_whitespace()
-        .map(|i| i.parse::<u32>())
+        .map(str::parse::<u32>)
         .collect::<Result<Vec<_>, _>>()
 }
 
 fn is_report_safe(report: &[u32]) -> bool {
-    let order = Order::get_order(report.first().unwrap(), report.get(1).unwrap());
+    let order = Order::get_order(*report.first().unwrap(), *report.get(1).unwrap());
     report
         .iter()
         .zip(report.iter().skip(1))
-        .all(|(prev, curr)| order.is_in_order(prev, curr))
+        .all(|(prev, curr)| order.is_in_order(*prev, *curr))
 }
 
 fn is_report_safe_with_dampener(report: &[u32]) -> bool {
@@ -60,8 +60,8 @@ fn is_report_safe_with_dampener(report: &[u32]) -> bool {
             &report
                 .iter()
                 .enumerate()
-                .filter_map(|(i, e)| if i != skip_index { Some(e) } else { None })
-                .cloned()
+                .filter_map(|(i, e)| if i == skip_index { None } else { Some(e) })
+                .copied()
                 .collect::<Vec<_>>(),
         )
     })
@@ -73,7 +73,7 @@ enum Order {
 }
 
 impl Order {
-    fn get_order(a: &u32, b: &u32) -> Order {
+    fn get_order(a: u32, b: u32) -> Order {
         if a > b {
             Order::Descending
         } else {
@@ -81,13 +81,13 @@ impl Order {
         }
     }
 
-    fn is_in_order(&self, a: &u32, b: &u32) -> bool {
+    fn is_in_order(&self, a: u32, b: u32) -> bool {
         let (lower, higher) = match self {
             Order::Ascending => (a, b),
             Order::Descending => (b, a),
         };
 
-        lower < higher && lower + 3 >= *higher
+        lower < higher && lower + 3 >= higher
     }
 }
 
