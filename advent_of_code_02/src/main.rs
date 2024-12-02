@@ -54,20 +54,17 @@ fn is_report_safe_with_dampener(report: &[u32]) -> bool {
         return true;
     }
 
-    for index in 0..report.len() {
+    (0..report.len()).any(|skip_index| {
         // create a new report without the n-th level
-        let new_report = report
-            .iter()
-            .enumerate()
-            .filter_map(|(i, e)| if i != index { Some(e) } else { None })
-            .cloned()
-            .collect::<Vec<_>>();
-        if is_report_safe(&new_report) {
-            return true;
-        }
-    }
-
-    false
+        is_report_safe(
+            &report
+                .iter()
+                .enumerate()
+                .filter_map(|(i, e)| if i != skip_index { Some(e) } else { None })
+                .cloned()
+                .collect::<Vec<_>>(),
+        )
+    })
 }
 
 enum Order {
