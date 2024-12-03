@@ -16,10 +16,11 @@ fn calculates_sum(filename: &str) -> Result<u32> {
     let haystack = parse_file(filename)?;
     let re = Regex::new(r"mul\((\d{1,3}),(\d{1,3})\)")?;
 
-    let mut sum = 0;
-    for (_, [mult1, mult2]) in re.captures_iter(&haystack).map(|c| c.extract()) {
-        sum += mult1.parse::<u32>()? * mult2.parse::<u32>()?;
-    }
+    let sum: u32 = re
+        .captures_iter(&haystack)
+        .map(|c| c.extract())
+        .map(|(_, [mult1, mult2])| mult1.parse::<u32>().unwrap() * mult2.parse::<u32>().unwrap())
+        .sum();
 
     Ok(sum)
 }
@@ -28,38 +29,33 @@ fn calculate_enabled_sum(filename: &str) -> Result<u32> {
     let haystack = parse_file(filename)?;
     let re = Regex::new(r"mul\((\d{1,3}),(\d{1,3})\)")?;
 
-    let mut mults = Vec::new();
-    for (start, (_, [mult1, mult2])) in re
+    let sum: u32 = re
         .captures_iter(&haystack)
         .map(|c| (c.get(1).unwrap().start(), c.extract()))
-    {
-        mults.push((start, mult1.parse::<u32>()? * mult2.parse::<u32>()?));
-    }
-
-    let mut sum = 0;
-    for (start, mult) in mults {
-        // find position of last do() and don't() starting from the regex start position
-        let last_do = haystack[0..start].rfind("do()");
-        let last_dont = haystack[0..start].rfind("don't()");
-
-        // set mult to None if don't() was after the last do()
-        let mut mult = Some(mult);
-        if let Some(last_dont) = last_dont {
-            if let Some(last_do) = last_do {
-                if last_dont > last_do {
-                    mult = None
-                }
+        .filter_map(|(index, (_, [mult1, mult2]))| {
+            let last_do = haystack[0..index].rfind("do()");
+            let last_dont = haystack[0..index].rfind("don't()");
+            if should_add(last_dont, last_do) {
+                Some(mult1.parse::<u32>().unwrap() * mult2.parse::<u32>().unwrap())
             } else {
-                mult = None;
+                None
             }
-        }
-
-        if let Some(mult) = mult {
-            sum += mult;
-        }
-    }
+        })
+        .sum();
 
     Ok(sum)
+}
+
+fn should_add(last_dont: Option<usize>, last_do: Option<usize>) -> bool {
+    if let Some(last_dont) = last_dont {
+        if let Some(last_do) = last_do {
+            last_dont < last_do // check if last don't() is befor the last do()
+        } else {
+            false // if there is a don't() but no do() then multiplication is disabled
+        }
+    } else {
+        true // if there was no don't() then multiplication is enabled
+    }
 }
 
 fn parse_file(filename: &str) -> Result<String> {
