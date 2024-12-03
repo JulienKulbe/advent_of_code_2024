@@ -19,7 +19,9 @@ fn calculates_sum(filename: &str) -> Result<u32> {
     let sum: u32 = re
         .captures_iter(&haystack)
         .map(|c| c.extract())
-        .map(|(_, [mult1, mult2])| mult1.parse::<u32>().unwrap() * mult2.parse::<u32>().unwrap())
+        .map(|(_, [mult1, mult2])| multiply(mult1, mult2))
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
         .sum();
 
     Ok(sum)
@@ -36,14 +38,22 @@ fn calculate_enabled_sum(filename: &str) -> Result<u32> {
             let last_do = haystack[0..index].rfind("do()");
             let last_dont = haystack[0..index].rfind("don't()");
             if should_add(last_dont, last_do) {
-                Some(mult1.parse::<u32>().unwrap() * mult2.parse::<u32>().unwrap())
+                Some(multiply(mult1, mult2))
             } else {
                 None
             }
         })
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
         .sum();
 
     Ok(sum)
+}
+
+fn multiply(a: &str, b: &str) -> Result<u32> {
+    let a = a.parse::<u32>()?;
+    let b = b.parse::<u32>()?;
+    Ok(a * b)
 }
 
 fn should_add(last_dont: Option<usize>, last_do: Option<usize>) -> bool {
