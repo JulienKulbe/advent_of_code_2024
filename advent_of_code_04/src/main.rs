@@ -5,8 +5,8 @@ fn main() -> Result<()> {
     let sum = count_xmas("input.txt")?;
     println!("Xmas found: {sum}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let sum = count_x_mas("input.txt")?;
+    println!("X-Mas found: {sum}");
 
     Ok(())
 }
@@ -24,8 +24,38 @@ fn count_xmas(filename: &str) -> Result<usize> {
     Ok(sum)
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn count_x_mas(filename: &str) -> Result<usize> {
+    let map = Map::new(filename);
+
+    let mut sum = 0;
+    for x in 0..map.width {
+        for y in 0..map.height {
+            let pos = Position(x, y);
+            if map.get(pos) == 'A' {
+                let top_left = map.go_to(pos, Direction::TopLeft);
+                let down_left = map.go_to(pos, Direction::DownLeft);
+                let top_right = map.go_to(pos, Direction::TopRight);
+                let down_right = map.go_to(pos, Direction::DownRight);
+                if top_left.is_some()
+                    && down_left.is_some()
+                    && top_right.is_some()
+                    && down_right.is_some()
+                {
+                    let mut diagonal1 = [map.get(top_left.unwrap()), map.get(down_right.unwrap())];
+                    let mut diagonal2 = [map.get(top_right.unwrap()), map.get(down_left.unwrap())];
+
+                    diagonal1.sort_unstable();
+                    diagonal2.sort_unstable();
+
+                    if diagonal1 == ['M', 'S'] && diagonal2 == ['M', 'S'] {
+                        sum += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(sum)
 }
 
 fn count_xmas_from_pos(map: &Map, pos: Position) -> usize {
@@ -188,18 +218,16 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
+        let result = count_x_mas("input_small_b.txt");
         assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
+        assert_eq!(9, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = count_x_mas("input.txt");
         assert!(result.is_ok());
-        assert_eq!(20351745, result.unwrap())
+        assert_eq!(1950, result.unwrap())
     }
 }
