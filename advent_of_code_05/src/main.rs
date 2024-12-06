@@ -5,8 +5,8 @@ fn main() -> Result<()> {
     let sum = middle_page_sum("input.txt")?;
     println!("Sum: {sum}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let sum = fix_unordered_pages("input.txt")?;
+    println!("Sum: {sum}");
 
     Ok(())
 }
@@ -21,8 +21,21 @@ fn middle_page_sum(filename: &str) -> Result<u32> {
         .sum())
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn fix_unordered_pages(filename: &str) -> Result<u32> {
+    let input = parse_file(filename)?;
+
+    Ok(input
+        .pages
+        .iter()
+        .filter_map(|page| {
+            if is_page_valid(page, &input.rules) {
+                None
+            } else {
+                Some(order_page(page, &input.rules))
+            }
+        })
+        .map(|page| page.0.get(page.0.len() / 2).unwrap().clone())
+        .sum())
 }
 
 fn parse_file(filename: &str) -> Result<InputData> {
@@ -59,6 +72,12 @@ fn is_page_valid(page: &Page, rules: &[OrderingRule]) -> bool {
         .iter()
         .enumerate()
         .all(|(i, p)| page.0[0..i].iter().all(|c| is_valid(*c, *p, rules)))
+}
+
+fn order_page(page: &Page, rules: &[OrderingRule]) -> Page {
+    let ordered_page = page.clone();
+
+    ordered_page.0.swap(a, b);
 }
 
 fn is_valid(from: u32, to: u32, rules: &[OrderingRule]) -> bool {
@@ -98,9 +117,8 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
+        let result = fix_unordered_pages("input_small.txt");
         assert!(result.is_ok());
         assert_eq!(31, result.unwrap())
     }
@@ -108,7 +126,7 @@ mod tests {
     #[test]
     #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = fix_unordered_pages("input.txt");
         assert!(result.is_ok());
         assert_eq!(20351745, result.unwrap())
     }
