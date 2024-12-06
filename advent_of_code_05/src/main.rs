@@ -11,6 +11,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+
 fn middle_page_sum(filename: &str) -> Result<u32> {
     let input = parse_file(filename)?;
     Ok(input
