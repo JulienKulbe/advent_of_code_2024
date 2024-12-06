@@ -5,8 +5,8 @@ fn main() -> Result<()> {
     let sum = number_distinct_positions("input.txt")?;
     println!("Sum: {sum}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let sum = count_obstacles("input.txt")?;
+    println!("Sum: {sum}");
 
     Ok(())
 }
@@ -24,10 +24,39 @@ fn number_distinct_positions(filename: &str) -> Result<usize> {
     Ok(map.visited())
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn count_obstacles(filename: &str) -> Result<u32> {
+    let original_map = Map::new(filename)?;
+    let original_guard = Guard::new(&original_map)?;
+
+    let mut sum = 0;
+    for y in 0..original_map.height {
+        for x in 0..original_map.width {
+            let mut map = original_map.clone();
+            let mut guard = original_guard;
+            let mut visited = Vec::new();
+
+            map.block(Position(x, y));
+
+            while let Some(pos) = guard.position {
+                if visited.contains(&(guard.position, guard.direction)) {
+                    //println!("Increase sum {sum}");
+                    sum += 1;
+                    break;
+                } else {
+                    visited.push((guard.position, guard.direction));
+                }
+
+                //println!("{:?}", pos);
+                map.visit(pos);
+                guard.go(&map);
+            }
+        }
+    }
+
+    Ok(sum)
 }
 
+#[derive(Debug, Clone)]
 struct Map {
     data: Vec<Vec<Field>>,
     width: usize,
@@ -65,11 +94,16 @@ impl Map {
     fn visit(&mut self, pos: Position) {
         self.data[pos.1][pos.0] = Field::Visited;
     }
+
+    fn block(&mut self, pos: Position) {
+        self.data[pos.1][pos.0] = Field::Blocked;
+    }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct Position(usize, usize);
 
+#[derive(Debug, Clone, Copy)]
 struct Guard {
     position: Option<Position>,
     direction: Direction,
@@ -133,6 +167,7 @@ impl Guard {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Direction {
     Up,
     Down,
@@ -189,18 +224,16 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
+        let result = count_obstacles("input_small.txt");
         assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
+        assert_eq!(6, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = count_obstacles("input.txt");
         assert!(result.is_ok());
-        assert_eq!(20351745, result.unwrap())
+        assert_eq!(1575, result.unwrap())
     }
 }
