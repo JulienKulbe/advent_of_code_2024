@@ -75,9 +75,19 @@ fn is_page_valid(page: &Page, rules: &[OrderingRule]) -> bool {
 }
 
 fn order_page(page: &Page, rules: &[OrderingRule]) -> Page {
-    let ordered_page = page.clone();
+    let mut ordered_page = page.clone();
+    while !is_page_valid(&ordered_page, rules) {
+        'outer: for (i, p) in ordered_page.0.iter().enumerate() {
+            for (j, c) in ordered_page.0[0..i].iter().enumerate() {
+                if !is_valid(*c, *p, rules) {
+                    ordered_page.0.swap(i, j);
+                    break 'outer;
+                }
+            }
+        }
+    }
 
-    ordered_page.0.swap(a, b);
+    ordered_page.clone()
 }
 
 fn is_valid(from: u32, to: u32, rules: &[OrderingRule]) -> bool {
@@ -91,6 +101,7 @@ struct InputData {
     pages: Vec<Page>,
 }
 
+#[derive(Debug, Clone)]
 struct Page(Vec<u32>);
 
 struct OrderingRule {
@@ -120,14 +131,13 @@ mod tests {
     fn test_small_b() {
         let result = fix_unordered_pages("input_small.txt");
         assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
+        assert_eq!(123, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_input_b() {
         let result = fix_unordered_pages("input.txt");
         assert!(result.is_ok());
-        assert_eq!(20351745, result.unwrap())
+        assert_eq!(4480, result.unwrap())
     }
 }
