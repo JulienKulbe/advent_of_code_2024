@@ -34,7 +34,7 @@ fn fix_unordered_pages(filename: &str) -> Result<u32> {
                 Some(order_page(page, &input.rules))
             }
         })
-        .map(|page| page.0.get(page.0.len() / 2).unwrap().clone())
+        .map(|page| page.0[page.0.len() / 2])
         .sum())
 }
 
