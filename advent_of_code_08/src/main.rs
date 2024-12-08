@@ -6,8 +6,8 @@ fn main() -> Result<()> {
     let anodes = count_anodes_of_antennas("input.txt")?;
     println!("Total Anodes: {anodes}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let anodes = count_anodes_of_resonance_antennas("input.txt")?;
+    println!("Total Anodes: {anodes}");
 
     Ok(())
 }
@@ -39,8 +39,49 @@ fn calculate_anodes(a: Position, b: Position) -> [Position; 2] {
     [first, second]
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn count_anodes_of_resonance_antennas(filename: &str) -> Result<usize> {
+    let map = parse_file(filename)?;
+    let antennas = Antennas::new(&map);
+
+    let mut anodes: Vec<Position> = Vec::new();
+    for (_, positions) in antennas.0 {
+        let mut current: Vec<Position> = positions
+            .iter()
+            .permutations(2)
+            .flat_map(|positions| calculate_resonance_anodes(&map, *positions[0], *positions[1]))
+            .collect();
+
+        anodes.append(&mut current);
+    }
+
+    let count = anodes.iter().unique().count();
+
+    Ok(count)
+}
+
+fn calculate_resonance_anodes(map: &Map, a: Position, b: Position) -> Vec<Position> {
+    let mut anodes = Vec::new();
+    anodes.append(&mut calculate_resonance_anodes_unidirectinal(map, a, b));
+    anodes.append(&mut calculate_resonance_anodes_unidirectinal(map, b, a));
+    anodes
+}
+
+fn calculate_resonance_anodes_unidirectinal(
+    map: &Map,
+    start: Position,
+    end: Position,
+) -> Vec<Position> {
+    let mut anodes = Vec::new();
+    let diff = Position(start.0 - end.0, start.1 - end.1);
+    for i in 1.. {
+        let anode = Position(start.0 - i * diff.0, start.1 - i * diff.1);
+        if map.is_valid(anode) {
+            anodes.push(anode);
+        } else {
+            break;
+        }
+    }
+    anodes
 }
 
 fn parse_file(filename: &str) -> Result<Map> {
@@ -112,22 +153,20 @@ mod tests {
     fn test_input_a() {
         let result = count_anodes_of_antennas("input.txt");
         assert!(result.is_ok());
-        assert_eq!(1579939, result.unwrap())
+        assert_eq!(280, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
+        let result = count_anodes_of_resonance_antennas("input_small.txt");
         assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
+        assert_eq!(34, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = count_anodes_of_resonance_antennas("input.txt");
         assert!(result.is_ok());
-        assert_eq!(20351745, result.unwrap())
+        assert_eq!(958, result.unwrap())
     }
 }
