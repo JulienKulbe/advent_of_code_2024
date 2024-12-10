@@ -6,8 +6,8 @@ fn main() -> Result<()> {
     let count = calculate_trailheads("input.txt")?;
     println!("Trailheads: {count}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let rating = calculate_trailhead_ratings("input.txt")?;
+    println!("Rating: {rating}");
 
     Ok(())
 }
@@ -24,8 +24,16 @@ fn calculate_trailheads(filename: &str) -> Result<usize> {
     Ok(trailheads)
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn calculate_trailhead_ratings(filename: &str) -> Result<usize> {
+    let map = Map::new(filename)?;
+
+    let trailheads = map
+        .get_starting_points()
+        .iter()
+        .map(|&start| map.get_trailhead_ratings(start))
+        .sum();
+
+    Ok(trailheads)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -109,6 +117,10 @@ impl Map {
             .count()
     }
 
+    fn get_trailhead_ratings(&self, start: Position) -> usize {
+        self.get_trailhead_ratings_internal(start, -1)
+    }
+
     fn get_trailheads_internal(&self, position: Position, previous: i8) -> Vec<Position> {
         let value = self.get(position);
         let mut trailheads = Vec::new();
@@ -127,6 +139,24 @@ impl Map {
         }
         trailheads
     }
+
+    fn get_trailhead_ratings_internal(&self, position: Position, previous: i8) -> usize {
+        let value = self.get(position);
+        if let Some(value) = value {
+            if value != previous + 1 {
+                0
+            } else if value == 9 {
+                1
+            } else {
+                Direction::all_directions()
+                    .map(|direction| direction.go_to(position))
+                    .map(|next| self.get_trailhead_ratings_internal(next, value))
+                    .sum()
+            }
+        } else {
+            0
+        }
+    }
 }
 
 #[cfg(test)]
@@ -144,22 +174,20 @@ mod tests {
     fn test_input_a() {
         let result = calculate_trailheads("input.txt");
         assert!(result.is_ok());
-        assert_eq!(1579939, result.unwrap())
+        assert_eq!(531, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
+        let result = calculate_trailhead_ratings("input_small.txt");
         assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
+        assert_eq!(81, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = calculate_trailhead_ratings("input.txt");
         assert!(result.is_ok());
-        assert_eq!(20351745, result.unwrap())
+        assert_eq!(1210, result.unwrap())
     }
 }
