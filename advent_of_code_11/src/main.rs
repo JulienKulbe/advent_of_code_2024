@@ -1,12 +1,12 @@
 use anyhow::Result;
-use std::fs::read_to_string;
+use std::{collections::BTreeMap, fs::read_to_string};
 
 fn main() -> Result<()> {
     let stones = count_stones("input.txt")?;
     println!("#Stones: {stones}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let stones = count_stones_opt("input.txt")?;
+    println!("Stones: {stones}");
 
     Ok(())
 }
@@ -21,8 +21,20 @@ fn count_stones(filename: &str) -> Result<usize> {
     Ok(stones.len())
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn count_stones_opt(filename: &str) -> Result<u64> {
+    let mut stones = BTreeMap::new();
+    for stone in parse_file(filename)? {
+        stones.insert(stone, 1);
+    }
+
+    let mut memory = BTreeMap::new();
+
+    for i in 0..75 {
+        stones = apply_stone_behavior_opt(stones, &mut memory);
+        println!("Iteration: {i}, Stones: {}", get_stone_count(&stones));
+    }
+
+    Ok(get_stone_count(&stones))
 }
 
 fn parse_file(filename: &str) -> Result<Vec<u64>> {
@@ -46,6 +58,36 @@ fn apply_stone_behavior(current: Vec<u64>) -> Vec<u64> {
     }
 
     result
+}
+
+fn apply_stone_behavior_opt(
+    current: BTreeMap<u64, u64>,
+    memory: &mut BTreeMap<u64, Vec<u64>>,
+) -> BTreeMap<u64, u64> {
+    let mut result: BTreeMap<u64, u64> = BTreeMap::new();
+    for (stone, n) in current.iter() {
+        let stones = if let Some(stones) = memory.get(stone) {
+            stones.clone()
+        } else {
+            let stones = apply_stone_behavior(vec![*stone]);
+            memory.insert(*stone, stones.clone());
+            stones
+        };
+
+        for stone in stones.iter() {
+            if let Some(count) = result.get_mut(stone) {
+                *count += n;
+            } else {
+                result.insert(*stone, *n);
+            }
+        }
+    }
+
+    result
+}
+
+fn get_stone_count(stones: &BTreeMap<u64, u64>) -> u64 {
+    stones.iter().map(|(_, c)| *c).sum()
 }
 
 fn has_even_digits(value: u64) -> bool {
@@ -81,18 +123,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "reason"]
-    fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
-        assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
-    }
-
-    #[test]
-    #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = count_stones_opt("input.txt");
         assert!(result.is_ok());
-        assert_eq!(20351745, result.unwrap())
+        assert_eq!(234430066982597, result.unwrap())
     }
 }
