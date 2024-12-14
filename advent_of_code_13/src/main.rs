@@ -6,8 +6,8 @@ fn main() -> Result<()> {
     let tokens = calculate_tokens("input.txt")?;
     println!("Minimum tokens: {tokens}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let tokens = calculate_tokens_with_offset("input.txt")?;
+    println!("Minimum tokens: {tokens}");
 
     Ok(())
 }
@@ -22,8 +22,21 @@ fn calculate_tokens(filename: &str) -> Result<i64> {
     Ok(tokens)
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn calculate_tokens_with_offset(filename: &str) -> Result<i64> {
+    let mut claw_machines = parse_file(filename)?;
+    for claw_machine in &mut claw_machines {
+        claw_machine.prize = Position(
+            claw_machine.prize.0 + 10000000000000,
+            claw_machine.prize.1 + 10000000000000,
+        );
+    }
+
+    let tokens = claw_machines
+        .iter()
+        .filter_map(|cm| cm.required_tokens())
+        .sum();
+
+    Ok(tokens)
 }
 
 fn parse_file(filename: &str) -> Result<Vec<ClawMachine>> {
@@ -89,18 +102,17 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
+        let result = calculate_tokens_with_offset("input_small.txt");
         assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
+        assert_eq!(875318608908, result.unwrap())
     }
 
     #[test]
     #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = calculate_tokens_with_offset("input.txt");
         assert!(result.is_ok());
-        assert_eq!(20351745, result.unwrap())
+        assert_eq!(87582154060429, result.unwrap())
     }
 }
