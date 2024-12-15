@@ -69,7 +69,6 @@ fn get_region(map: &Map, pos: Position, key: char) -> Region {
     let perimeter = get_region_perimeter(&positions);
     let sides = get_region_sides(&positions);
     Region {
-        key,
         positions,
         area,
         perimeter,
@@ -124,7 +123,6 @@ fn get_region_sides(positions: &Vec<Position>) -> usize {
     }
 
     let mut sum = 0;
-
     for direction in Direction::get_all_directions() {
         let positions: Vec<Position> = sides
             .iter()
@@ -215,7 +213,6 @@ impl Position {
 }
 
 struct Region {
-    key: char,
     positions: Vec<Position>,
     area: usize,
     perimeter: usize,
