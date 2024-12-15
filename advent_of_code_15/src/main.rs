@@ -1,18 +1,18 @@
 use anyhow::Result;
-use std::{collections::VecDeque, fs::read_to_string};
+use std::{collections::VecDeque, fmt::Debug, fs::read_to_string};
 
 fn main() -> Result<()> {
     let sum = calculate_gps_sum("input.txt")?;
     println!("GPS sum: {sum}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let sum = calculate_gps_sum_scaled_map("input.txt")?;
+    println!("GPS: {sum}");
 
     Ok(())
 }
 
 fn calculate_gps_sum(filename: &str) -> Result<usize> {
-    let (mut map, mut robot) = parse_file(filename)?;
+    let (mut map, mut robot) = parse_file(filename, false)?;
 
     while let Some(direction) = robot.0.pop_front() {
         map.robot_move(direction);
@@ -21,11 +21,19 @@ fn calculate_gps_sum(filename: &str) -> Result<usize> {
     Ok(map.get_box_coordinates())
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn calculate_gps_sum_scaled_map(filename: &str) -> Result<usize> {
+    let (mut map, mut robot) = parse_file(filename, true)?;
+    //println!("Initial:\n{:?}", map);
+
+    while let Some(direction) = robot.0.pop_front() {
+        map.robot_move(direction);
+        //println!("{:?}:\n{:?}", direction, map);
+    }
+
+    Ok(map.get_box_coordinates())
 }
 
-fn parse_file(filename: &str) -> Result<(Map, RobotMovements)> {
+fn parse_file(filename: &str, scaled: bool) -> Result<(Map, RobotMovements)> {
     let data = read_to_string(filename)?;
     let index = data.find("\n\n").expect("No blank line found");
     let map = data[..index]
@@ -38,7 +46,7 @@ fn parse_file(filename: &str) -> Result<(Map, RobotMovements)> {
         .map(Direction::from)
         .collect();
 
-    Ok((Map::new(map), RobotMovements(movement)))
+    Ok((Map::new(map, scaled), RobotMovements(movement)))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,6 +74,8 @@ enum Entity {
     Empty,
     Wall,
     Box,
+    LeftBox,
+    RightBox,
     Robot,
 }
 
@@ -101,10 +111,29 @@ struct Map {
 }
 
 impl Map {
-    fn new(data: Vec<Vec<Entity>>) -> Map {
+    fn new(mut data: Vec<Vec<Entity>>, scaled: bool) -> Map {
+        if scaled {
+            let mut scaled_map = Vec::new();
+            for row in data.iter() {
+                let mut new_row = Vec::new();
+                for row in row {
+                    let entities = match *row {
+                        Entity::Box => [Entity::LeftBox, Entity::RightBox],
+                        Entity::Empty => [Entity::Empty, Entity::Empty],
+                        Entity::Wall => [Entity::Wall, Entity::Wall],
+                        Entity::Robot => [Entity::Robot, Entity::Empty],
+                        _ => panic!("Invalid Entity"),
+                    };
+                    new_row.append(&mut Vec::from(entities));
+                }
+                scaled_map.push(new_row);
+            }
+            data = scaled_map;
+        }
+
         let mut robot = None;
-        for (y, column) in data.iter().enumerate() {
-            for (x, e) in column.iter().enumerate() {
+        for (y, row) in data.iter().enumerate() {
+            for (x, e) in row.iter().enumerate() {
                 if *e == Entity::Robot {
                     robot = Some(Position(x, y));
                 }
@@ -119,7 +148,7 @@ impl Map {
 
     fn robot_move(&mut self, direction: Direction) {
         if self.can_move(self.robot, direction) {
-            self.move_to(self.robot, direction);
+            self.move_to(self.robot, direction, false);
             self.robot = self.robot.go_to(direction);
         }
     }
@@ -129,18 +158,51 @@ impl Map {
         match entity {
             Entity::Empty => true,
             Entity::Wall => false,
+            Entity::LeftBox => {
+                self.can_move_big_box(position, position.go_to(Direction::Right), direction)
+            }
+            Entity::RightBox => {
+                self.can_move_big_box(position.go_to(Direction::Left), position, direction)
+            }
             _ => self.can_move(position.go_to(direction), direction),
         }
     }
 
-    fn move_to(&mut self, position: Position, direction: Direction) {
+    fn can_move_big_box(&self, left: Position, right: Position, direction: Direction) -> bool {
+        match direction {
+            Direction::Left => self.can_move(left.go_to(Direction::Left), Direction::Left),
+            Direction::Right => self.can_move(right.go_to(Direction::Right), Direction::Right),
+            Direction::Up => {
+                self.can_move(left.go_to(Direction::Up), Direction::Up)
+                    && self.can_move(right.go_to(Direction::Up), Direction::Up)
+            }
+            Direction::Down => {
+                self.can_move(left.go_to(Direction::Down), Direction::Down)
+                    && self.can_move(right.go_to(Direction::Down), Direction::Down)
+            }
+        }
+    }
+
+    fn move_to(&mut self, position: Position, direction: Direction, is_big_box: bool) {
         let entity = self.data[position.1][position.0];
         let new_position = position.go_to(direction);
         let new_entity = self.data[new_position.1][new_position.0];
 
         // if new position is a box then first move the box in the direction
-        if new_entity == Entity::Box {
-            self.move_to(new_position, direction);
+        if new_entity == Entity::Box
+            || new_entity == Entity::LeftBox
+            || new_entity == Entity::RightBox
+        {
+            self.move_to(new_position, direction, false);
+        }
+
+        if !is_big_box && (direction == Direction::Down || direction == Direction::Up) {
+            if entity == Entity::LeftBox {
+                self.move_to(position.go_to(Direction::Right), direction, true);
+            }
+            if entity == Entity::RightBox {
+                self.move_to(position.go_to(Direction::Left), direction, true);
+            }
         }
 
         self.data[position.1][position.0] = Entity::Empty;
@@ -151,7 +213,7 @@ impl Map {
         let mut sum = 0;
         for (y, column) in self.data.iter().enumerate() {
             for (x, e) in column.iter().enumerate() {
-                if *e == Entity::Box {
+                if *e == Entity::Box || *e == Entity::LeftBox {
                     sum += self.get_gps(Position(x, y));
                 }
             }
@@ -161,6 +223,29 @@ impl Map {
 
     fn get_gps(&self, position: Position) -> usize {
         position.0 + 100 * position.1
+    }
+}
+
+impl Debug for Map {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut map = String::new();
+        for row in &self.data {
+            let mut row_map = String::new();
+            for entity in row {
+                row_map.push(match entity {
+                    Entity::Box => 'O',
+                    Entity::Wall => '#',
+                    Entity::LeftBox => '[',
+                    Entity::RightBox => ']',
+                    Entity::Robot => '@',
+                    Entity::Empty => '.',
+                });
+            }
+            map.push_str(&row_map);
+            map.push('\n');
+        }
+
+        write!(f, "{map}")
     }
 }
 
@@ -192,18 +277,16 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
+        let result = calculate_gps_sum_scaled_map("input_small.txt");
         assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
+        assert_eq!(9021, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = calculate_gps_sum_scaled_map("input.txt");
         assert!(result.is_ok());
-        assert_eq!(20351745, result.unwrap())
+        assert_eq!(1486520, result.unwrap())
     }
 }
