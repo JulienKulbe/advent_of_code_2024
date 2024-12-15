@@ -6,15 +6,34 @@ fn main() -> Result<()> {
     let price = calculate_fencing_price("input.txt")?;
     println!("Price: {price}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let price = calculate_fencing_price_ext("input.txt")?;
+    println!("Price: {price}");
 
     Ok(())
 }
 
 fn calculate_fencing_price(filename: &str) -> Result<usize> {
-    let mut map = parse_file(filename)?;
+    let map = parse_file(filename)?;
+    let price = get_regions_from_map(map)
+        .iter()
+        .map(|region| region.perimeter * region.area)
+        .sum();
 
+    Ok(price)
+}
+
+fn calculate_fencing_price_ext(filename: &str) -> Result<usize> {
+    let map = parse_file(filename)?;
+
+    let price = get_regions_from_map(map)
+        .iter()
+        .map(|region| region.sides * region.area)
+        .sum();
+
+    Ok(price)
+}
+
+fn get_regions_from_map(mut map: Map) -> Vec<Region> {
     let mut regions = Vec::new();
     for (x, y) in (0..map.width).cartesian_product(0..map.height) {
         if let Field::Garden(key) = map.get(x, y) {
@@ -25,17 +44,7 @@ fn calculate_fencing_price(filename: &str) -> Result<usize> {
             regions.push(region);
         }
     }
-
-    let price = regions
-        .iter()
-        .map(|region| region.perimeter * region.area)
-        .sum();
-
-    Ok(price)
-}
-
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+    regions
 }
 
 fn parse_file(filename: &str) -> Result<Map> {
@@ -58,11 +67,13 @@ fn get_region(map: &Map, pos: Position, key: char) -> Region {
     let positions = get_region_positions(map, pos, key);
     let area = positions.len();
     let perimeter = get_region_perimeter(&positions);
+    let sides = get_region_sides(&positions);
     Region {
         key,
         positions,
         area,
         perimeter,
+        sides,
     }
 }
 
@@ -100,7 +111,74 @@ fn get_region_perimeter(positions: &Vec<Position>) -> usize {
     perimeter
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+fn get_region_sides(positions: &Vec<Position>) -> usize {
+    // get all sides from positions
+    let mut sides = Vec::new();
+    for pos in positions {
+        for direction in Direction::get_all_directions() {
+            let near = pos.go_to(*direction);
+            if !positions.contains(&near) {
+                sides.push((*direction, *pos));
+            }
+        }
+    }
+
+    let mut sum = 0;
+
+    for direction in Direction::get_all_directions() {
+        let positions: Vec<Position> = sides
+            .iter()
+            .filter(|(d, _)| d == direction)
+            .map(|(_, position)| *position)
+            .collect();
+
+        if *direction == Direction::Up || *direction == Direction::Down {
+            let min = positions.iter().map(|pos| pos.y).min().unwrap();
+            let max = positions.iter().map(|pos| pos.y).max().unwrap();
+            for y in min..=max {
+                let x_positions: Vec<i32> = positions
+                    .iter()
+                    .filter(|pos| pos.y == y)
+                    .map(|pos| pos.x)
+                    .collect();
+                sum += calculate_sections(x_positions);
+            }
+        } else {
+            let min = positions.iter().map(|pos| pos.x).min().unwrap();
+            let max = positions.iter().map(|pos| pos.x).max().unwrap();
+            for x in min..=max {
+                let y_positions: Vec<i32> = positions
+                    .iter()
+                    .filter(|pos| pos.x == x)
+                    .map(|pos| pos.y)
+                    .collect();
+                sum += calculate_sections(y_positions);
+            }
+        }
+    }
+
+    sum
+}
+
+fn calculate_sections(mut positions: Vec<i32>) -> usize {
+    if positions.is_empty() {
+        return 0;
+    }
+
+    positions.sort_unstable();
+
+    let mut sections = 1;
+    let mut curr = positions[0];
+    for next in positions.iter().skip(1) {
+        if *next > curr + 1 {
+            sections += 1;
+        }
+        curr = *next;
+    }
+    sections
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct Position {
     x: i32,
     y: i32,
@@ -141,6 +219,7 @@ struct Region {
     positions: Vec<Position>,
     area: usize,
     perimeter: usize,
+    sides: usize,
 }
 
 struct Map {
@@ -173,7 +252,7 @@ enum Field {
     Garden(char),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Direction {
     Up,
     Down,
@@ -226,9 +305,23 @@ mod tests {
     }
 
     #[test]
+    fn test_small_ext_a() {
+        let result = calculate_fencing_price_ext("input_small_a.txt");
+        assert!(result.is_ok());
+        assert_eq!(80, result.unwrap())
+    }
+
+    #[test]
+    fn test_small_ext_c() {
+        let result = calculate_fencing_price_ext("input_small_c.txt");
+        assert!(result.is_ok());
+        assert_eq!(1206, result.unwrap())
+    }
+
+    #[test]
     #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = calculate_fencing_price_ext("input.txt");
         assert!(result.is_ok());
         assert_eq!(20351745, result.unwrap())
     }
