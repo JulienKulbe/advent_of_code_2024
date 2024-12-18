@@ -6,8 +6,8 @@ fn main() -> Result<()> {
     let path = calculate_shortest_path("input.txt", 1024, 71)?;
     println!("Shortest path: {path}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let coordinate = prevent_exit_position("input.txt", 71)?;
+    println!("Coordinate: {:?}", coordinate);
 
     Ok(())
 }
@@ -23,8 +23,17 @@ fn calculate_shortest_path(
     Ok(length)
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn prevent_exit_position(filename: &str, dimension: usize) -> Result<Position> {
+    let memory = parse_file(filename)?;
+
+    for i in 0.. {
+        let length = Graph::find_shortest_path_length(&memory.0[..i], dimension);
+        if length == 0 {
+            return Ok(memory.0[i - 1]);
+        }
+    }
+
+    unreachable!()
 }
 
 fn parse_file(filename: &str) -> Result<CorruptedMemory> {
@@ -73,7 +82,7 @@ impl Node {
     fn new(position: Position) -> Node {
         Node {
             position,
-            distance: usize::MAX,
+            distance: 5000,
             previous: None,
             visited: false,
         }
@@ -168,22 +177,13 @@ mod tests {
     fn test_input_a() {
         let result = calculate_shortest_path("input.txt", 1024, 71);
         assert!(result.is_ok());
-        //assert_eq!(1579939, result.unwrap())
+        assert_eq!(326, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
+        let result = prevent_exit_position("input_small.txt", 7);
         assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
-    }
-
-    #[test]
-    #[ignore = "reason"]
-    fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
-        assert!(result.is_ok());
-        assert_eq!(20351745, result.unwrap())
+        assert_eq!(Position(6, 1), result.unwrap())
     }
 }
