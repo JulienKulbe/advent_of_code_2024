@@ -5,15 +5,15 @@ fn main() -> Result<()> {
     let designs = possible_designs("input.txt")?;
     println!("Possible designs: {designs}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let designs = count_possible_designs("input.txt")?;
+    println!("Possible designs: {designs}");
 
     Ok(())
 }
 
 fn possible_designs(filename: &str) -> Result<usize> {
     let (towels, designs) = parse_file(filename)?;
-    let mut memo = Memo(BTreeMap::new());
+    let mut memo = BTreeMap::new();
 
     let sum = designs
         .0
@@ -24,8 +24,17 @@ fn possible_designs(filename: &str) -> Result<usize> {
     Ok(sum)
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn count_possible_designs(filename: &str) -> Result<usize> {
+    let (towels, designs) = parse_file(filename)?;
+    let mut memo = BTreeMap::new();
+
+    let sum = designs
+        .0
+        .iter()
+        .map(|design| towels.count_possible_designs(design, &mut memo))
+        .sum();
+
+    Ok(sum)
 }
 
 fn parse_file(filename: &str) -> Result<(Towels, Designs)> {
@@ -46,29 +55,46 @@ fn parse_file(filename: &str) -> Result<(Towels, Designs)> {
 struct Towels(Vec<String>);
 
 impl Towels {
-    fn can_create_design(&self, design: &str, memo: &mut Memo) -> bool {
+    fn can_create_design(&self, design: &str, memo: &mut BTreeMap<String, bool>) -> bool {
         if design.is_empty() {
             return true;
         }
-        if let Some(result) = memo.0.get(design) {
+        if let Some(result) = memo.get(design) {
             return *result;
         }
 
         for towel in &self.0 {
             if design.starts_with(towel) && self.can_create_design(&design[towel.len()..], memo) {
-                memo.0.insert(design.to_string(), true);
+                memo.insert(design.to_string(), true);
                 return true;
             }
         }
 
-        memo.0.insert(design.to_string(), false);
+        memo.insert(design.to_string(), false);
         false
+    }
+
+    fn count_possible_designs(&self, design: &str, memo: &mut BTreeMap<String, usize>) -> usize {
+        if design.is_empty() {
+            return 1;
+        }
+        if let Some(result) = memo.get(design) {
+            return *result;
+        }
+
+        let sum = self
+            .0
+            .iter()
+            .filter(|&towel| design.starts_with(towel))
+            .map(|towel| self.count_possible_designs(&design[towel.len()..], memo))
+            .sum();
+
+        memo.insert(design.to_string(), sum);
+        sum
     }
 }
 
 struct Designs(Vec<String>);
-
-struct Memo(BTreeMap<String, bool>);
 
 #[cfg(test)]
 mod tests {
@@ -85,22 +111,20 @@ mod tests {
     fn test_input_a() {
         let result = possible_designs("input.txt");
         assert!(result.is_ok());
-        assert_eq!(1579939, result.unwrap())
+        assert_eq!(324, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
+        let result = count_possible_designs("input_small.txt");
         assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
+        assert_eq!(16, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = count_possible_designs("input.txt");
         assert!(result.is_ok());
-        assert_eq!(20351745, result.unwrap())
+        assert_eq!(575227823167869, result.unwrap())
     }
 }
