@@ -199,7 +199,7 @@ mod tests {
     fn test_input_a() {
         let result = sum_secret_numbers("input.txt");
         assert!(result.is_ok());
-        assert_eq!(1579939, result.unwrap())
+        assert_eq!(14082561342, result.unwrap())
     }
 
     #[test]
@@ -222,10 +222,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_input_b() {
         let result = get_max_price("input.txt");
         assert!(result.is_ok());
-        assert_eq!(20351745, result.unwrap())
+        assert_eq!(1568, result.unwrap())
     }
 }
