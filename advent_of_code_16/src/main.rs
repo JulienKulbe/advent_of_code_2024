@@ -6,20 +6,22 @@ fn main() -> Result<()> {
     let score = get_lowest_score("input.txt")?;
     println!("Lowest score: {score}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let path = get_shortest_path("input.txt")?;
+    println!("Shortest path: {path}");
 
     Ok(())
 }
 
 fn get_lowest_score(filename: &str) -> Result<usize> {
     let map = parse_file(filename)?;
-    let score = Graph::find_shortest_path(&map);
+    let score = Graph::find_shortest_path_cost(&map);
     Ok(score)
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn get_shortest_path(filename: &str) -> Result<usize> {
+    let map = parse_file(filename)?;
+    let score = Graph::find_shortest_path_length(&map);
+    Ok(score)
 }
 
 fn parse_file(filename: &str) -> Result<Map> {
@@ -76,71 +78,79 @@ impl Position {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Node {
+    position: Position,
+    distance: usize,
+    previous: Option<usize>,
+    visited: bool,
+}
+
+impl Node {
+    fn new(position: Position) -> Self {
+        Node {
+            position,
+            distance: usize::MAX,
+            previous: None,
+            visited: false,
+        }
+    }
+}
+
 struct Graph {
-    data: Vec<Position>,
-    dist: Vec<usize>,
-    prev: Vec<Option<usize>>,
-    queue: Vec<Option<usize>>,
-    start: Position,
-    end: Position,
+    nodes: Vec<Node>,
+    start: usize,
+    end: usize,
 }
 
 impl Graph {
-    fn find_shortest_path(map: &Map) -> usize {
+    fn find_shortest_path_cost(map: &Map) -> usize {
         let mut graph = Graph::new(map);
         graph.calculate_dijkstra();
         graph.cost_to_end()
+    }
+
+    fn find_shortest_path_length(map: &Map) -> usize {
+        let mut graph = Graph::new(map);
+        graph.calculate_dijkstra();
+        graph.path_lenth()
     }
 
     fn new(map: &Map) -> Graph {
         let height = map.data.len();
         let width = map.data[0].len();
 
-        let data: Vec<Position> = (0..width)
+        let nodes: Vec<Node> = (0..width)
             .cartesian_product(0..height)
             .map(|(x, y)| Position(x, y))
             .filter(|pos| map.get(*pos) != Field::Wall)
+            .map(Node::new)
             .collect();
 
-        let dist = vec![usize::MAX; data.len()];
-        let prev = vec![None; data.len()];
-        let queue = data.iter().enumerate().map(|(i, _)| Some(i)).collect();
-
-        let start = *data
+        let start = nodes
             .iter()
-            .find(|&&pos| map.get(pos) == Field::Start)
+            .position(|node| map.get(node.position) == Field::Start)
             .expect("No start field");
-        let end = *data
+        let end = nodes
             .iter()
-            .find(|&&pos| map.get(pos) == Field::End)
+            .position(|node| map.get(node.position) == Field::End)
             .expect("No end field");
 
-        Graph {
-            data,
-            dist,
-            prev,
-            queue,
-            start,
-            end,
-        }
+        Graph { nodes, start, end }
     }
 
     fn calculate_dijkstra(&mut self) {
-        let start = self.index(self.start).unwrap();
-        self.dist[start] = 0;
+        self.nodes[self.start].distance = 0;
 
-        while self.queue.iter().any(|i| i.is_some()) {
-            let u = self.get_minimum_dist();
-            self.queue[u] = None;
+        while let Some(u) = self.get_minimum_dist() {
+            self.nodes[u].visited = true;
 
-            for neighbor in self.data[u].get_neighbors() {
+            for neighbor in self.nodes[u].position.get_neighbors() {
                 if let Some(v) = self.index(neighbor) {
-                    if let Some(v) = self.queue[v] {
-                        let alt = self.dist[u] + self.get_cost(u, v);
-                        if alt < self.dist[v] {
-                            self.dist[v] = alt;
-                            self.prev[v] = Some(u);
-                        }
+                    let alt = self.nodes[u].distance + self.get_cost(self.nodes[u], self.nodes[v]);
+                    if alt < self.nodes[v].distance {
+                        self.nodes[v].distance = alt;
+                        self.nodes[v].previous = Some(u);
                     }
                 }
             }
@@ -148,35 +158,46 @@ impl Graph {
     }
 
     fn cost_to_end(&self) -> usize {
-        let end = self.index(self.end).unwrap();
-        self.dist[end]
+        self.nodes[self.end].distance
+    }
+
+    fn path_lenth(&self) -> usize {
+        let mut length = 0;
+        let mut current = Some(self.end);
+
+        while let Some(index) = current {
+            length += 1;
+            current = self.nodes[index].previous;
+        }
+
+        length
     }
 
     fn index(&self, position: Position) -> Option<usize> {
-        self.data.iter().position(|&pos| pos == position)
+        self.nodes.iter().position(|node| node.position == position)
     }
 
-    fn get_minimum_dist(&self) -> usize {
-        self.queue
+    fn get_minimum_dist(&self) -> Option<usize> {
+        let node = self
+            .nodes
             .iter()
-            .zip(self.dist.iter())
-            .filter(|(&i, _)| i.is_some())
-            .min_by_key(|(_, &dist)| dist)
-            .map(|(i, _)| i.unwrap())
-            .unwrap()
+            .filter(|node| !node.visited)
+            .min_by_key(|node| node.distance);
+        if let Some(node) = node {
+            self.index(node.position)
+        } else {
+            None
+        }
     }
 
-    fn get_cost(&self, curr: usize, next: usize) -> usize {
-        let next = self.data[next];
-        let previous = self.prev[curr];
-        let previous = if let Some(index) = previous {
-            self.data[index]
+    fn get_cost(&self, curr: Node, next: Node) -> usize {
+        let previous = if let Some(index) = curr.previous {
+            self.nodes[index].position
         } else {
-            let current = self.data[curr];
-            Position(current.0 - 1, current.1)
+            Position(curr.position.0 - 1, curr.position.1)
         };
 
-        if previous.0 == next.0 || previous.1 == next.1 {
+        if previous.0 == next.position.0 || previous.1 == next.position.1 {
             1
         } else {
             1001
@@ -206,21 +227,20 @@ mod tests {
     fn test_input_a() {
         let result = get_lowest_score("input.txt");
         assert!(result.is_ok());
-        assert_eq!(1579939, result.unwrap())
+        assert_eq!(98484, result.unwrap())
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
+        let result = get_shortest_path("input_small.txt");
         assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
+        assert_eq!(64, result.unwrap())
     }
 
     #[test]
     #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = get_shortest_path("input.txt");
         assert!(result.is_ok());
         assert_eq!(20351745, result.unwrap())
     }
