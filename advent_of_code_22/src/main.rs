@@ -1,12 +1,13 @@
 use anyhow::Result;
-use std::fs::read_to_string;
+use itertools::Itertools;
+use std::{collections::HashSet, fs::read_to_string};
 
 fn main() -> Result<()> {
     let sum = sum_secret_numbers("input.txt")?;
     println!("Sum: {sum}");
 
-    let score = calculate_similarity_score("input.txt")?;
-    println!("Similarity score: {score}");
+    let max = get_max_price("input.txt")?;
+    println!("Max Price: {max}");
 
     Ok(())
 }
@@ -20,8 +21,31 @@ fn sum_secret_numbers(filename: &str) -> Result<u64> {
     Ok(sum)
 }
 
-fn calculate_similarity_score(filename: &str) -> Result<u32> {
-    Ok(1)
+fn get_max_price(filename: &str) -> Result<u64> {
+    let seeds = parse_file(filename)?;
+    let secrets: Vec<Vec<Secret>> = seeds
+        .iter()
+        .map(|seed| get_secret_numbers(*seed, 2000))
+        .collect();
+
+    let prices: Vec<Vec<Price>> = secrets.iter().map(|secrets| get_prices(secrets)).collect();
+    let diffs: HashSet<[i64; 4]> = prices
+        .iter()
+        .flat_map(|prices| get_diff_prices(prices, 10))
+        .collect();
+
+    let max = diffs
+        .iter()
+        .map(|diff| {
+            prices
+                .iter()
+                .filter_map(|prices| get_price_for_diff(prices, diff))
+                .sum::<u64>()
+        })
+        .max()
+        .unwrap();
+
+    Ok(max)
 }
 
 fn parse_file(filename: &str) -> Result<Vec<Secret>> {
@@ -36,6 +60,44 @@ fn get_secret_number(start: Secret, iterations: usize) -> Secret {
         current = current.next();
     }
     current
+}
+
+fn get_secret_numbers(start: Secret, iterations: usize) -> Vec<Secret> {
+    let mut current = start;
+    let mut secrets = vec![current];
+    for _ in 0..iterations {
+        current = current.next();
+        secrets.push(current);
+    }
+    secrets
+}
+
+fn get_prices(secrets: &[Secret]) -> Vec<Price> {
+    secrets
+        .iter()
+        .map(|secret| secret.price())
+        .tuple_windows()
+        .map(|(prev, curr)| Price::new(prev, curr))
+        .collect()
+}
+
+fn get_diff_prices(prices: &[Price], count: usize) -> Vec<[i64; 4]> {
+    prices
+        .iter()
+        .tuple_windows()
+        .map(|(a, b, c, d)| ([a.diff, b.diff, c.diff, d.diff], d.total))
+        .sorted_by(|a, b| Ord::cmp(&b.1, &a.1))
+        .take(count)
+        .map(|(diff, _)| diff)
+        .collect()
+}
+
+fn get_price_for_diff(prices: &[Price], diff: &[i64; 4]) -> Option<u64> {
+    prices
+        .iter()
+        .tuple_windows()
+        .find(|(a, b, c, d)| [a.diff, b.diff, c.diff, d.diff] == *diff)
+        .map(|(_, _, _, d)| d.total)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -53,6 +115,10 @@ impl Secret {
             .step(|value| value * 2048)
     }
 
+    fn price(&self) -> u64 {
+        self.0 % 10
+    }
+
     fn step(&self, op: impl Fn(u64) -> u64) -> Self {
         let mix = op(self.0);
         self.mix(mix).prune()
@@ -66,6 +132,20 @@ impl Secret {
     fn prune(&self) -> Self {
         let next = self.0 % 16777216;
         Secret(next)
+    }
+}
+
+struct Price {
+    total: u64,
+    diff: i64,
+}
+
+impl Price {
+    fn new(prev: u64, current: u64) -> Self {
+        Price {
+            total: current,
+            diff: current as i64 - prev as i64,
+        }
     }
 }
 
@@ -123,17 +203,28 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "reason"]
     fn test_small_b() {
-        let result = calculate_similarity_score("input_small.txt");
-        assert!(result.is_ok());
-        assert_eq!(31, result.unwrap())
+        let seeds = [Secret(1), Secret(2), Secret(3), Secret(2024)];
+        let secrets: Vec<Vec<Secret>> = seeds
+            .iter()
+            .map(|seed| get_secret_numbers(*seed, 2000))
+            .collect();
+
+        let prices: Vec<Vec<Price>> = secrets.iter().map(|secrets| get_prices(secrets)).collect();
+
+        let diff: [i64; 4] = [-2, 1, -1, 3];
+        let max = prices
+            .iter()
+            .filter_map(|prices| get_price_for_diff(prices, &diff))
+            .sum::<u64>();
+
+        assert_eq!(23, max)
     }
 
     #[test]
     #[ignore = "reason"]
     fn test_input_b() {
-        let result = calculate_similarity_score("input.txt");
+        let result = get_max_price("input.txt");
         assert!(result.is_ok());
         assert_eq!(20351745, result.unwrap())
     }
